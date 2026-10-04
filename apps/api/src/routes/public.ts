@@ -16,7 +16,7 @@ export async function publicRoutes(app: FastifyInstance) {
       FROM promotions p LEFT JOIN coupons c ON c.id=p.coupon_id
       WHERE p.active AND (p.starts_at IS NULL OR p.starts_at <= now()) AND (p.ends_at IS NULL OR p.ends_at > now()) ORDER BY p.created_at DESC LIMIT 20`);
     const pf = await fileDtos(promos.map((p) => p.asset_file_id));
-    reply.header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    reply.header('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
     return {
       branding: { appName: branding.appName, companyText: branding.companyText, tagline: branding.tagline, positioning: branding.positioning, homeBranding: branding.homeBranding, promoBranding: branding.promoBranding,
         logoUrl: logo(branding.logoFileId), splashLogoUrl: logo(branding.splashLogoFileId) ?? logo(branding.logoFileId), loginLogoUrl: logo(branding.loginLogoFileId) ?? logo(branding.logoFileId), iconUrl: logo(branding.iconFileId) },
@@ -34,7 +34,7 @@ export async function publicRoutes(app: FastifyInstance) {
   app.get('/plans', async (_req, reply) => {
     const plans = await many(pool, `SELECT id, code, name, kind, interval, price_minor, compare_at_minor, currency, credits, features, description, badge
       FROM plans WHERE active AND (starts_at IS NULL OR starts_at <= now()) AND (ends_at IS NULL OR ends_at > now()) ORDER BY sort, price_minor`);
-    reply.header('Cache-Control', 'public, max-age=15');
+    reply.header('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
     return { plans: plans.map((p) => ({ ...p, priceMinor: p.price_minor, compareAtMinor: p.compare_at_minor })) };
   });
 }

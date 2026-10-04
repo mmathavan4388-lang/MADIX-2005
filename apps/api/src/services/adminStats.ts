@@ -45,7 +45,7 @@ export async function analytics(days: number) {
   const chat = (await one(pool, `SELECT count(*)::int n FROM analytics_events WHERE name='ai_chat' AND day > current_date - $1::int`, [days])).n;
   const features = await many(pool, `SELECT name, count(*)::int AS n FROM analytics_events WHERE day > current_date - $1::int AND name <> 'login' GROUP BY name ORDER BY n DESC LIMIT 12`, [days]);
   const trial = await one(pool, `SELECT count(*)::int started, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id=t.user_id))::int converted FROM trials t WHERE t.started_at > now() - make_interval(days => $1)`, [days]);
-  const verified = (await one(pool, `SELECT count(*)::int n FROM users WHERE email_verified_at IS NOT NULL AND created_at > now() - make_interval(days => $1)`, [days])).n;
+  const verified = (await one(pool, `SELECT count(*)::int n FROM users WHERE role='user' AND email_verified_at IS NOT NULL AND created_at > now() - make_interval(days => $1)`, [days])).n;
   const registered = (await one(pool, `SELECT count(*)::int n FROM users WHERE role='user' AND created_at > now() - make_interval(days => $1)`, [days])).n;
   const referrals = await one(pool, `SELECT count(*)::int total, count(*) FILTER (WHERE status='qualified')::int qualified, count(*) FILTER (WHERE status='rejected')::int rejected FROM referrals WHERE created_at > now() - make_interval(days => $1)`, [days]);
   // D1/D7 retention for signup cohorts in range

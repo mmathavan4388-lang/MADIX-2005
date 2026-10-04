@@ -1,0 +1,47 @@
+# Production-like stack on one machine (staging / small deployments). For scale, run api & worker as separate services on your
+# orchestrator and use managed Postgres + S3/R2 + CDN. Copy .env.example to .env first.
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: madix, POSTGRES_PASSWORD: "${DB_PASSWORD:-madix}", POSTGRES_DB: madix }
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U madix"], interval: 5s, timeout: 3s, retries: 10 }
+
+  minio:                                     # S3-compatible object storage for local/staging; use S3 or R2 in production
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: madixminio, MINIO_ROOT_PASSWORD: "${MINIO_PASSWORD:-madixminio-secret}" }
+    volumes: [objects:/data]
+    ports: ["9001:9001"]
+
+  migrate:
+    build: { context: ., dockerfile: deploy/Dockerfile.api }
+    command: sh -c "node dist/db/migrate.js && node dist/db/seed.js"
+    env_file: .env
+    environment: { DATABASE_URL: "postgres://madix:${DB_PASSWORD:-madix}@db:5432/madix" }
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+
+  api:
+    build: { context: ., dockerfile: deploy/Dockerfile.api }
+    env_file: .env
+    environment: { DATABASE_URL: "postgres://madix:${DB_PASSWORD:-madix}@db:5432/madix", TRUST_PROXY: "true" }
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:4000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s }
+    restart: unless-stopped
+
+  worker:                                    # scale horizontally: docker compose up --scale worker=3
+    build: { context: ., dockerfile: deploy/Dockerfile.api }
+    command: ["node", "dist/worker.js"]
+    env_file: .env
+    environment: { DATABASE_URL: "postgres://madix:${DB_PASSWORD:-madix}@db:5432/madix" }
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: deploy/Dockerfile.web }
+    ports: ["8080:80"]
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes: { dbdata: {}, objects: {} }

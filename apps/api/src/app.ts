@@ -22,7 +22,9 @@ declare module 'fastify' {
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: config.NODE_ENV === 'test' && !process.env.TEST_LOG ? false : { level: isProd ? 'info' : 'debug', redact: ['req.headers.authorization', 'req.headers.cookie'] },
+    logger: config.NODE_ENV === 'test' && !process.env.TEST_LOG ? false : { level: isProd ? 'info' : 'debug', redact: ['req.headers.authorization', 'req.headers.cookie'],
+      // never log query strings: they carry short-lived tokens (SSE) and signed media signatures
+      serializers: { req: (r: any) => ({ method: r.method, url: String(r.url).split('?')[0], remoteAddress: r.ip }) } },
     trustProxy: config.TRUST_PROXY, bodyLimit: 2 * 1024 * 1024,
   });
 
@@ -32,7 +34,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     global: true, max: 300, timeWindow: '1 minute',
     allowList: () => config.NODE_ENV === 'test' && !process.env.TEST_RATE_LIMIT,
     keyGenerator: (req) => req.user?.id ?? req.ip,
-    errorResponseBuilder: () => ({ error: { code: 'rate_limited', message: 'Too many requests. Please slow down and try again shortly.' } }),
+    errorResponseBuilder: (_req, ctx) => ({ statusCode: 429, code: 'rate_limited', error: 'Too Many Requests', message: 'Too many requests.', after: ctx.after }),
   });
 
   // Keep the raw body for webhook signature verification.

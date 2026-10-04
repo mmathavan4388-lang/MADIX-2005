@@ -55,3 +55,13 @@ export const isProd = config.NODE_ENV === 'production';
 if (isProd && config.STORAGE_DRIVER === 'local') {
   console.warn('WARNING: STORAGE_DRIVER=local in production is not scalable. Use s3.');
 }
+
+// Fail fast on unsafe production configuration.
+if (isProd) {
+  const problems: string[] = [];
+  for (const k of ['JWT_SECRET', 'DATA_ENCRYPTION_KEY'] as const) if (/change-me|dev-|test-/.test(config[k])) problems.push(`${k} looks like a placeholder`);
+  if (config.PUBLIC_WEB_URL.startsWith('http://')) problems.push('PUBLIC_WEB_URL must be https');
+  if (config.STORAGE_DRIVER === 's3' && !config.S3_BUCKET) problems.push('S3_BUCKET is required');
+  if (!config.SMTP_URL) problems.push('SMTP_URL is required (verification and reset emails)');
+  if (problems.length) { console.error('Refusing to start in production:\n - ' + problems.join('\n - ')); process.exit(1); }
+}

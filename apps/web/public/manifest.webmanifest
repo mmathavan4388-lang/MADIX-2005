@@ -1,0 +1,2 @@
+{ "name": "MADIX", "short_name": "MADIX", "description": "Create. Chat. Edit. Share. — All in MADIX. from SAYRIX MATHAV", "start_url": "/", "display": "standalone", "background_color": "#050507", "theme_color": "#050507",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }] }

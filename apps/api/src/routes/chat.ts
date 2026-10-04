@@ -30,6 +30,9 @@ const MSG_SQL = `SELECT m.*, u.username FROM messages m JOIN users u ON u.id=m.s
 export async function chatRoutes(app: FastifyInstance) {
   const pre = { preHandler: app.verified };
 
+  app.get('/unread', pre, async (req) => ({ unread: (await one(pool, `SELECT count(*)::int n FROM messages m JOIN conversation_members cm ON cm.conversation_id=m.conversation_id AND cm.user_id=$1
+    WHERE m.sender_id<>$1 AND m.deleted_at IS NULL AND m.created_at > cm.last_read_at`, [req.user!.id])).n }));
+
   app.get('/conversations', pre, async (req) => {
     const uid = req.user!.id;
     const rows = await many(pool, `SELECT c.id, c.kind, c.title, c.last_message_at,

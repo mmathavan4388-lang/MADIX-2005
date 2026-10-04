@@ -182,3 +182,17 @@ describe('notifications & realtime', () => {
     expect((await app.inject({ method: 'POST', url: '/api/v1/auth/login', headers: { 'content-type': 'application/json' }, payload: '{bad json' })).statusCode).toBe(400);
   });
 });
+
+describe('media delivery', () => {
+  it('local media supports HTTP range requests for video seeking', async () => {
+    const u = await signup(app);
+    const up = await uploadFile(app, u.auth, 'reel', 'video/mp4', makeVideo(1));
+    const url = new URL(up.res.json().file.originalUrl ?? up.res.json().file.url);
+    const full = await app.inject({ method: 'GET', url: url.pathname + url.search });
+    expect(full.statusCode).toBe(200); expect(full.headers['accept-ranges']).toBe('bytes');
+    const part = await app.inject({ method: 'GET', url: url.pathname + url.search, headers: { range: 'bytes=0-99' } });
+    expect(part.statusCode).toBe(206); expect(part.rawPayload.length).toBe(100); expect(part.headers['content-range']).toMatch(/^bytes 0-99\//);
+    const bad = await app.inject({ method: 'GET', url: url.pathname + url.search, headers: { range: 'bytes=99999999-' } });
+    expect(bad.statusCode).toBe(416);
+  });
+});
